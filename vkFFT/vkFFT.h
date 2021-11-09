@@ -915,9 +915,9 @@ static inline VkFFTResult appendExtensions(VkFFTSpecializationConstantsLayout* s
 	}
 #elif(VKFFT_BACKEND==1)
 #elif(VKFFT_BACKEND==2)
-	sc->tempLen = sprintf(sc->tempStr, "\
-#include <hip/hip_runtime.h>\n");
-	res = VkAppendLine(sc);
+	//sc->tempLen = sprintf(sc->tempStr, "\
+//#include <hip/hip_runtime.h>\n");
+//	res = VkAppendLine(sc);
 	if (res != VKFFT_SUCCESS) return res;
 #elif(VKFFT_BACKEND==3)
 	if ((!strcmp(floatType, "double")) || (sc->useUint64)) {
@@ -26660,3 +26660,4 @@ static inline int VkFFTGetVersion() {
 	return 10213; //X.XX.XX format
 }
 #endif
+
