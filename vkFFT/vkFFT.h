@@ -57,6 +57,11 @@
 #endif
 #endif
 
+#include <fstream>
+#include <sstream>
+
+int g_counter = 0;
+
 typedef struct {
 	//WHDCN layout
 
@@ -22659,6 +22664,19 @@ static inline VkFFTResult VkFFTPlanR2CMultiUploadDecomposition(VkFFTApplication*
 			return VKFFT_ERROR_FAILED_TO_ADD_NAME_EXPRESSION;
 		}
 
+		char* p_env;
+                p_env  = getenv ("VKFFT_DUMP");
+                if (p_env != NULL && p_env[0] == '1')
+		{
+		    std::stringstream ss;
+		    ss << "kernel" << g_counter << ".cpp";
+		    std::fstream ofs;
+		    ofs.open(ss.str());
+                    ofs.write(code0, app->configuration.maxCodeLength);
+                    ofs.close();
+		    g_counter++;
+		}
+
 		result = hiprtcCompileProgram(prog,  // prog
 			0,     // numOptions
 			0); // options
@@ -24688,6 +24706,19 @@ static inline VkFFTResult VkFFTPlanAxis(VkFFTApplication* app, VkFFTPlan* FFTPla
 			deleteVkFFT(app);
 			return VKFFT_ERROR_FAILED_TO_ADD_NAME_EXPRESSION;
 		}
+
+		char* p_env;
+                p_env  = getenv ("VKFFT_DUMP");
+                if (p_env != NULL && p_env[0] == '1')
+                {
+                    std::stringstream ss;
+                    ss << "kernel" << g_counter << ".cpp";
+                    std::fstream ofs;
+                    ofs.open(ss.str());
+                    ofs.write(code0, app->configuration.maxCodeLength);
+                    ofs.close();
+                    g_counter++;
+                }
 
 		result = hiprtcCompileProgram(prog,  // prog
 			0,     // numOptions
