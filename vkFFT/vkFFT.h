@@ -60,7 +60,7 @@
 #include <fstream>
 #include <sstream>
 
-int g_counter = 0;
+static int g_counter = 0;
 
 typedef struct {
 	//WHDCN layout
@@ -22668,10 +22668,17 @@ static inline VkFFTResult VkFFTPlanR2CMultiUploadDecomposition(VkFFTApplication*
                 p_env  = getenv ("VKFFT_DUMP");
                 if (p_env != NULL && p_env[0] == '1')
 		{
-		    std::stringstream ss;
-		    ss << "kernel" << g_counter << ".cpp";
-		    std::fstream ofs;
-		    ofs.open(ss.str());
+                    std::stringstream ss;
+                    ss << "./kernel" << g_counter << ".cpp";
+                    std::ofstream ofs;
+                    std::cout << "fiename" << ss.str()  << ", code size " <<  app->configuration.maxCodeLength << std::endl;
+
+                    ofs.open(ss.str().c_str());
+                    if (ofs)
+                        ofs.write(code0, app->configuration.maxCodeLength);
+                    else
+                        std::cout << "open failed!\n";
+
                     ofs.write(code0, app->configuration.maxCodeLength);
                     ofs.close();
 		    g_counter++;
@@ -24712,10 +24719,16 @@ static inline VkFFTResult VkFFTPlanAxis(VkFFTApplication* app, VkFFTPlan* FFTPla
                 if (p_env != NULL && p_env[0] == '1')
                 {
                     std::stringstream ss;
-                    ss << "kernel" << g_counter << ".cpp";
-                    std::fstream ofs;
-                    ofs.open(ss.str());
-                    ofs.write(code0, app->configuration.maxCodeLength);
+                    ss << "./kernel" << g_counter << ".cpp";
+                    std::ofstream ofs;
+		    std::cout << "fiename" << ss.str()  << ", code size " <<  app->configuration.maxCodeLength << std::endl;
+
+		    ofs.open(ss.str().c_str());
+                    if (ofs)
+		        ofs.write(code0, app->configuration.maxCodeLength);
+		    else
+		        std::cout << "open failed!\n";
+
                     ofs.close();
                     g_counter++;
                 }
