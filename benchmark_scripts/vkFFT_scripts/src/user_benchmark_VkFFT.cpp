@@ -82,6 +82,11 @@ VkFFTResult user_benchmark_VkFFT(VkGPU* vkGPU, uint64_t file_output, FILE* outpu
 			//Setting up FFT configuration for forward and inverse FFT.
 			configuration.FFTdim = 1; //FFT dimension, 1D, 2D or 3D (default 1).
 			//if (n == 1) configuration.keepShaderCode = 1;
+                        
+			char* p_env;
+                        p_env  = getenv ("VKFFT_USE_LUT");
+                        if (p_env != NULL && p_env[0] == '1')
+			    configuration.useLUT = 1;
 
 			configuration.size[0] = userParams->X;
 			configuration.size[1] = userParams->Y;
