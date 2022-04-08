@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.11)
 project(Vulkan_FFT)
 set(CMAKE_CONFIGURATION_TYPES "Release" CACHE STRING "" FORCE)
 set(CMAKE_BUILD_TYPE "Release" CACHE STRING "" FORCE)
@@ -87,6 +87,7 @@ else()
 endif()
 	set_property(TARGET ${PROJECT_NAME} PROPERTY CUDA_ARCHITECTURES 35 60 70 75 80 86)
 	target_compile_options(${PROJECT_NAME} PUBLIC "$<$<COMPILE_LANGUAGE:CUDA>:SHELL:
+	-std=c++11
 	-DVKFFT_BACKEND=${VKFFT_BACKEND}
 	-gencode arch=compute_35,code=compute_35
 	-gencode arch=compute_60,code=compute_60
@@ -99,12 +100,22 @@ endif()
 elseif(${VKFFT_BACKEND} EQUAL 2)
 	list(APPEND CMAKE_PREFIX_PATH /opt/rocm/hip /opt/rocm)
 	find_package(hip)
+	#target_compile_definitions(${PROJECT_NAME} PUBLIC -DVKFFT_OLD_ROCM) #ROCm versions before 4.5 needed kernel include of hiprtc
 elseif(${VKFFT_BACKEND} EQUAL 3)
 	find_package(OpenCL REQUIRED)
 endif()
 
 target_compile_definitions(${PROJECT_NAME} PUBLIC -DVK_API_VERSION=11)#10 - Vulkan 1.0, 11 - Vulkan 1.1, 12 - Vulkan 1.2 
 if(${VKFFT_BACKEND} EQUAL 0)
+	FetchContent_Declare(
+		glslang-master
+		GIT_REPOSITORY https://github.com/KhronosGroup/glslang
+		SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/glslang-master
+	)
+	FetchContent_GetProperties(glslang-master)
+	if(NOT glslang-master_POPULATED)
+		FetchContent_Populate(glslang-master)
+	endif()
 	target_include_directories(${PROJECT_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/glslang-master/glslang/Include/)
 	add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/glslang-master)
 endif()
@@ -190,6 +201,7 @@ if(build_VkFFT_cuFFT_benchmark)
 	set_property(TARGET cuFFT_scripts PROPERTY CUDA_ARCHITECTURES 35 60 70 75 80 86)
 	CUDA_ADD_CUFFT_TO_TARGET(cuFFT_scripts)
 	target_compile_options(cuFFT_scripts PRIVATE "$<$<COMPILE_LANGUAGE:CUDA>:SHELL:
+	-std=c++11
 	-gencode arch=compute_35,code=compute_35
 	-gencode arch=compute_60,code=compute_60
 	-gencode arch=compute_70,code=compute_70 
@@ -205,7 +217,7 @@ if(build_VkFFT_rocFFT_benchmark)
 	add_definitions(-DUSE_rocFFT)
 	list(APPEND CMAKE_PREFIX_PATH /opt/rocm/hip /opt/rocm)
 	find_package(hip)
-	find_package(hipfft)
+    find_package(hipfft)
 
 	if(build_VkFFT_FFTW_precision)
 		add_library(rocFFT_scripts STATIC
@@ -239,3 +251,5 @@ if(build_VkFFT_rocFFT_benchmark)
 	target_link_libraries(rocFFT_scripts PRIVATE hip::host hip::hipfft)
 	target_link_libraries(${PROJECT_NAME} PUBLIC rocFFT_scripts)
 endif()
+install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/vkFFT/vkFFT.h" DESTINATION include)
+install(TARGETS ${PROJECT_NAME} DESTINATION bin)

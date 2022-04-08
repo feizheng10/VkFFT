@@ -7,6 +7,8 @@
 \usepackage{geometry}
 \geometry{verbose,tmargin=2.5cm,bmargin=2.5cm,lmargin=2.5cm,rmargin=2.5cm}
 \usepackage{stackrel}
+\usepackage[unicode=true]
+ {hyperref}
 
 \makeatletter
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%% User specified LaTeX commands.
@@ -42,7 +44,7 @@
 {\Large Dmitrii Tolmachev\par} 	
 	
 \vspace{1cm} 	
-{\large September 2021, version 1.2.12\par} 
+{\large January 2021, version 1.2.20\par} 
 \end{titlepage}
 
 \newpage{}
@@ -156,6 +158,7 @@ find_package(hip)
 target_include_directories(${PROJECT_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/vkFFT/)
 add_library(VkFFT INTERFACE)
 target_compile_definitions(VkFFT INTERFACE -DVKFFT_BACKEND=2)
+#target_compile_definitions(${PROJECT_NAME} PUBLIC -DVKFFT_OLD_ROCM) #ROCm versions before 4.5 needed kernel include of hiprtc
 
 target_link_libraries(${PROJECT_NAME} PUBLIC hip::host VkFFT)
 \end{minted}
@@ -363,8 +366,8 @@ padded to $2\cdot(floor(\frac{N_{x}}{2})+1)$ real elements in H stride
 will not be read so it does not matter what data is there before the
 write stage). All other strides are done as a multiplication between
 the previous stride and the number of elements in the previous axis.
-These are the default values of R2C/C2R strides in in-place mode if
-they are not explicitly specified.
+These are the default values of R2C/C2R strides if they are not explicitly
+specified.
 
 It is possible to specify separate sets of strides for all user-defined
 buffers: bufferStride for the main buffer, inputStride for input buffer,
@@ -372,9 +375,9 @@ outputStride for output buffer (kernel stride is assumed to be the
 same as bufferStride, tempBuffer strides are configured automatically). 
 
 For an out-of-place R2C FFT, there is no need to pad buffer with real
-numbers, so VkFFT uses natural H stride as default there - $N_{x}$
-real elements for real space and $floor(\frac{N_{x}}{2})+1$ complex
-numbers for the frequency space.
+numbers, but user must specify H stride there (as it differs to default
+one) - $N_{x}$ real elements for real space and $floor(\frac{N_{x}}{2})+1$
+complex numbers for the frequency space.
 
 An out-of-place C2R FFT is a more tricky transform. In the multidimensional
 case, the main buffer will be written to and read from multiple times.
@@ -386,6 +389,10 @@ buffer will be used as inputBuffer, real buffer as buffer). Second,
 use the third buffer, so both input and output buffers have their
 original layouts (complex buffer will be used as inputBuffer, the
 main buffer for calculations is buffer and output real buffer as outputBuffer).
+If you use inverseReturnToInputBuffer option, where R2C is configured
+to read from input buffer and C2R is configured to write to the input
+buffer; C2R will modify the buffer it reads from in some cases (see
+issue \href{https://github.com/DTolm/VkFFT/issues/58\#issuecomment-1007205682}{\#58})
 
 \subsection{VkFFT algorithms}
 
@@ -820,6 +827,10 @@ be specified at launch. In addition to them having the same size/layout/strides
 as defined during the application creation, the application must be
 created with flags enabling the corresponding buffer usage: isInputFormatted/isOutputFormatted/userTempBuffer/performConvolution
 respectively.
+\item bufferOffset/tempBufferOffset/inputBufferOffset/outputBufferOffset/kernelOffset
+- specify if VkFFT has to offset the first element position inside
+the corresponding buffer. In bytes. Default 0. specifyOffsetsAtLaunch
+parameter must be enabled during the initializeVkFFT call before. 
 \end{itemize}
 Depending on the API, the execution model may vary and require additional
 information at launch:
@@ -938,6 +949,12 @@ cl_mem* inputBuffer;	// Pointer to device buffer used to read data from if isInp
 cl_mem* outputBuffer;	// Pointer to device buffer used to write data to if isOutputFormatted is enabled
 cl_mem* kernel;	// Pointer to device buffer used to read kernel data from if performConvolution is enabled
 #endif
+uint64_t bufferOffset;	// Specify if VkFFT has to offset the first element position inside the buffer. In bytes. Default 0
+uint64_t tempBufferOffset;	// Specify if VkFFT has to offset the first element position inside the temp buffer. In bytes. Default 0
+uint64_t inputBufferOffset;	// Specify if VkFFT has to offset the first element position inside the input buffer. In bytes. Default 0
+uint64_t outputBufferOffset;	// Specify if VkFFT has to offset the first element position inside the output buffer. In bytes. Default 0
+uint64_t kernelOffset;	// Specify if VkFFT has to offset the first element position inside the kernel. In bytes. Default 0
+uint64_t specifyOffsetsAtLaunch;	// Specify if offsets will be selected with launch parameters VkFFTLaunchParams (0 - off, 1 - on). Default 0
 
 // Optional: (default 0 if not stated otherwise)
 uint64_t coalescedMemory;	// In bytes, for Nvidia and AMD is equal to 32, Intel is equal 64, scaled for half precision. Going to work regardless, but if specified by user correctly, the performance will be higher.
@@ -968,6 +985,11 @@ uint64_t inputBufferStride[3];	// Input buffer strides. Used if isInputFormatted
 uint64_t outputBufferStride[3];	// Output buffer strides. Used if isInputFormatted is enabled. Default set to bufferStride values
 uint64_t considerAllAxesStrided;	// Will create plan for non-strided axis similar as a strided axis - used with disableReorderFourStep to get the same layout for Bluestein kernel (0 - off, 1 - on)
 uint64_t keepShaderCode;	// Will keep shader code and print all executed shaders during the plan execution in order (0 - off, 1 - on)
+uint64_t printMemoryLayout;	// Will print order of buffers used in shaders (0 - off, 1 - on) 
+
+uint64_t saveApplicationToString;	// Will save all compiled binaries to VkFFTApplication.saveApplicationString (will be allocated by VkFFT, deallocated with deleteVkFFT call). VkFFTApplication.applicationStringSize will contain size of binary in bytes. (0 - off, 1 - on)
+uint64_t loadApplicationFromString;	// Will load all binaries from loadApplicationString instead of recompiling them (must be allocated by user, must contain what saveApplicationToString call generated previously in VkFFTApplication.saveApplicationString). (0 - off, 1 - on). Mutually exclusive with saveApplicationToString
+void* loadApplicationString;	// Memory array (uint32_t* for Vulkan/HIP, char* for CUDA/OpenCL) through which user can load VkFFT binaries, must be provided by user if loadApplicationFromString = 1. 
 
 // Optional zero padding control parameters: (default 0 if not stated otherwise)
 uint64_t performZeropadding[3];	// Don't read some data/perform computations if some input sequences are zeropadded for each axis (0 - off, 1 - on)
@@ -1135,7 +1157,8 @@ outputBufferOffset/ kernelOffset) specifies offset from the start
 of the buffer sequence. It must be specified in bytes and must be
 divisible by the number type size used in the corresponding array
 (otherwise, the offset will be truncated). It is provided as a single
-uint64\_t value. Optional parameters.
+uint64\_t value. Can be provided at launch time, if specifyOffsetsAtLaunch
+parameter is enabled during initialization call. Optional parameters.
 
 User can provide custom dimension strides for buffer/inputBuffer/outputBuffer
 buffers - uint64\_t{[}3{]} array. Strides are specified in elements
@@ -1295,6 +1318,24 @@ Default 0, set to 1 to enable. Optional parameter.
 
 uint64\_t printMemoryLayout - debugging option, will print order of
 buffers used in kernels. Default 0, set to 1 to enable. Optional parameter. 
+
+uint64\_t saveApplicationToString - will save all compiled binaries
+to VkFFTApplication.saveApplicationString (will be allocated by VkFFT,
+deallocated with deleteVkFFT call). VkFFTApplication.applicationStringSize
+will contain size of binary in bytes. Default 0, set to 1 to enable.
+Optional parameter.
+
+uint64\_t loadApplicationFromString - will load all binaries from
+loadApplicationString instead of recompiling them (loadApplicationString
+must be allocated by user, must contain what saveApplicationToString
+call generated previously in VkFFTApplication.saveApplicationString).
+Default 0, set to 1 to enable. Optional parameter. Mutually exclusive
+with saveApplicationToString 
+
+void{*} loadApplicationString - memory array (uint32\_t{*} for Vulkan
+and HIP, char{*} for CUDA/OpenCL) through which user can load VkFFT
+binaries, must be provided by user if loadApplicationFromString =
+1. 
 
 \subsubsection{Zero padding parameters}
 
@@ -1943,4 +1984,57 @@ convolution_configuration.conjugateConvolution = 1;
 
 \end{minted}
 \end{mdframed}
+
+\subsection{Simple FFT application binary reuse application}
+
+This example shows how to save/load binaries generated by VkFFT. This
+can reduce time taken by initializeVkFFT call by removing RTC components
+from it. Be sure that rest of the configuration stays the same to
+reuse the binary.
+
+\begin{mdframed}[backgroundcolor=bg]
+\begin{minted}[tabsize=4,obeytabs,breaklines]{C}
+VkFFTConfiguration configuration = {};
+VkFFTApplication app = {};
+
+//configuration is initialized like in other examples
+configuration.saveApplicationToString = 1;
+//configuration.loadApplicationFromString = 1; //choose one to save/load binary file
+
+if (configuration.loadApplicationFromString) {
+	FILE* kernelCache;
+	uint64_t str_len;
+#if((VKFFT_BACKEND==0) || (VKFFT_BACKEND==2))
+	kernelCache = fopen("VkFFT_binary", "rb"); //Vulkan and HIP backends load data as a uint32_t sequence
+#else
+	kernelCache = fopen("VkFFT_binary", "r"); 
+#endif
+	fseek(kernelCache, 0, SEEK_END);
+	str_len = ftell(kernelCache);
+	fseek(kernelCache, 0, SEEK_SET);
+	configuration.loadApplicationString = malloc(str_len);
+	fread(configuration.loadApplicationString, str_len, 1, kernelCache);
+	fclose(kernelCache);
+}
+
+resFFT = initializeVkFFT(&app, configuration);
+if (resFFT != VKFFT_SUCCESS) return resFFT;
+
+if (configuration.loadApplicationFromString)
+	free(configuration.loadApplicationString);
+
+if (configuration.saveApplicationToString) {
+	FILE* kernelCache;
+#if((VKFFT_BACKEND==0) || (VKFFT_BACKEND==2))
+	kernelCache = fopen("VkFFT_binary", "wb"); //Vulkan and HIP backends save data as a uint32_t sequence
+#else
+	kernelCache = fopen("VkFFT_binary", "w"); 
+#endif
+	fwrite(app.saveApplicationString, app.applicationStringSize, 1, kernelCache);
+	fclose(kernelCache);
+}
+
+//application is launched like in other examples
+\end{minted}
+\end{mdframed} 
 \end{document}
