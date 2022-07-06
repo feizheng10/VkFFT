@@ -55,10 +55,14 @@
 #include <OpenCL/opencl.h>
 #else
 #include <CL/cl.h>
-#endif
 #elif(VKFFT_BACKEND==4)
 #include <ze_api.h>
 #endif
+
+#include <fstream>
+#include <sstream>
+
+static int g_counter = 0;
 
 typedef struct {
 	//WHDCN layout
@@ -23546,6 +23550,26 @@ static inline VkFFTResult VkFFTPlanR2CMultiUploadDecomposition(VkFFTApplication*
 		}
 		else
 		{
+			char* p_env;
+            p_env  = getenv ("VKFFT_DUMP");
+            if (p_env != NULL && p_env[0] == '1')
+				{
+                    std::stringstream ss;
+                    ss << "./kernel" << g_counter << ".cpp";
+                    std::ofstream ofs;
+                    std::cout << "fiename" << ss.str()  << ", code size " <<  app->configuration.maxCodeLength << std::endl;
+
+                    ofs.open(ss.str().c_str());
+                    if (ofs)
+                        ofs.write(code0, app->configuration.maxCodeLength);
+                    else
+                        std::cout << "open failed!\n";
+
+                    ofs.write(code0, app->configuration.maxCodeLength);
+                    ofs.close();
+		    	g_counter++;
+			}
+
 			hiprtcProgram prog;
 			enum hiprtcResult result = hiprtcCreateProgram(&prog,         // prog
 				code0,         // buffer
@@ -26010,6 +26034,25 @@ static inline VkFFTResult VkFFTPlanAxis(VkFFTApplication* app, VkFFTPlan* FFTPla
 		}
 		else
 		{
+			char* p_env;
+            p_env  = getenv ("VKFFT_DUMP");
+            if (p_env != NULL && p_env[0] == '1')
+                {
+                    std::stringstream ss;
+                    ss << "./kernel" << g_counter << ".cpp";
+                    std::ofstream ofs;
+		            std::cout << "fiename" << ss.str()  << ", code size " <<  app->configuration.maxCodeLength << std::endl;
+
+					ofs.open(ss.str().c_str());
+							if (ofs)
+						ofs.write(code0, app->configuration.maxCodeLength);
+					else
+						std::cout << "open failed!\n";
+
+                    ofs.close();
+                    g_counter++;
+            }
+
 			hiprtcProgram prog;
 			enum hiprtcResult result = hiprtcCreateProgram(&prog,         // prog
 				code0,         // buffer
