@@ -55,6 +55,7 @@
 #include <OpenCL/opencl.h>
 #else
 #include <CL/cl.h>
+#endif
 #elif(VKFFT_BACKEND==4)
 #include <ze_api.h>
 #endif
